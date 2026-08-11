@@ -19,7 +19,7 @@ test("PWA manifest and offline worker are complete", async () => {
 });
 
 test("local persistence, content engine and critical flows exist", async () => {
-  const [db, program, emergency, relapse, games, settings, store, progress, help, client, suggestionField] = await Promise.all([
+  const [db, program, emergency, relapse, games, settings, store, progress, help, client, suggestionField, workerConfig, worker] = await Promise.all([
     readFile(new URL("src/db/lifehub-db.ts", root), "utf8"),
     readFile(new URL("src/content/days/program.ts", root), "utf8"),
     readFile(new URL("src/features/emergency/EmergencyFlow.tsx", root), "utf8"),
@@ -31,6 +31,8 @@ test("local persistence, content engine and critical flows exist", async () => {
     readFile(new URL("src/pages/HelpPage.tsx", root), "utf8"),
     readFile(new URL("src/app/LifeHubClient.tsx", root), "utf8"),
     readFile(new URL("src/components/SuggestionField.tsx", root), "utf8"),
+    readFile(new URL("wrangler.jsonc", root), "utf8"),
+    readFile(new URL("src/worker.ts", root), "utf8"),
   ]);
   assert.match(db, /DB_NAME = "lifehub-local"/);
   assert.match(db, /openDB\(DB_NAME/);
@@ -49,6 +51,9 @@ test("local persistence, content engine and critical flows exist", async () => {
   assert.doesNotMatch(client, /window\.history\.pushState/);
   assert.match(suggestionField, /const EMPTY_SUGGESTIONS/);
   assert.match(suggestionField, /\?\? EMPTY_SUGGESTIONS/);
+  assert.match(workerConfig, /"directory": "\.\/dist"/);
+  assert.match(workerConfig, /"name": "lifehub-quit-smoking-new"/);
+  assert.match(worker, /env\.ASSETS\.fetch\(request\)/);
 });
 
 test("production static bundle contains the application shell without a catch-all redirect", async () => {
