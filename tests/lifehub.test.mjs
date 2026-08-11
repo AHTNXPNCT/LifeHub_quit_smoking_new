@@ -12,13 +12,14 @@ test("PWA manifest and offline worker are complete", async () => {
   assert.ok(manifest.icons.some((icon) => icon.sizes === "192x192"));
   assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512"));
   assert.match(worker, /caches\.open/);
-  assert.match(worker, /request\.mode === "navigate"/);
+  assert.match(worker, /const response = await fetch\(request\)/);
+  assert.match(worker, /if \(cached\) return cached/);
   await access(new URL("public/icon-192.png", root));
   await access(new URL("public/icon-512.png", root));
 });
 
 test("local persistence, content engine and critical flows exist", async () => {
-  const [db, program, emergency, relapse, games, settings, store, progress, help, client] = await Promise.all([
+  const [db, program, emergency, relapse, games, settings, store, progress, help, client, suggestionField] = await Promise.all([
     readFile(new URL("src/db/lifehub-db.ts", root), "utf8"),
     readFile(new URL("src/content/days/program.ts", root), "utf8"),
     readFile(new URL("src/features/emergency/EmergencyFlow.tsx", root), "utf8"),
@@ -29,6 +30,7 @@ test("local persistence, content engine and critical flows exist", async () => {
     readFile(new URL("src/pages/ProgressPage.tsx", root), "utf8"),
     readFile(new URL("src/pages/HelpPage.tsx", root), "utf8"),
     readFile(new URL("src/app/LifeHubClient.tsx", root), "utf8"),
+    readFile(new URL("src/components/SuggestionField.tsx", root), "utf8"),
   ]);
   assert.match(db, /DB_NAME = "lifehub-local"/);
   assert.match(db, /openDB\(DB_NAME/);
@@ -45,6 +47,8 @@ test("local persistence, content engine and critical flows exist", async () => {
   for (const format of ["exportJson", "exportCsv", "exportPdf", "importJson"]) assert.match(settings, new RegExp(format));
   assert.match(client, /window\.location\.hash = next/);
   assert.doesNotMatch(client, /window\.history\.pushState/);
+  assert.match(suggestionField, /const EMPTY_SUGGESTIONS/);
+  assert.match(suggestionField, /\?\? EMPTY_SUGGESTIONS/);
 });
 
 test("production static bundle contains the application shell without a catch-all redirect", async () => {
