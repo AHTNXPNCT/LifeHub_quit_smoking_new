@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { loadLifeHubData, replaceLifeHubData, saveLifeHubData } from "@/src/db/lifehub-db";
-import type { CbtEntry, CravingEntry, DashboardWidgetId, DayDraft, EmergencySession, ForestObject, GameId, LifeHubData, MoodEntry, Profile, RelapseEntry, ThemeName } from "@/src/entities/types";
+import type { ActivityDay, CbtEntry, CravingEntry, DashboardWidgetId, DayDraft, EmergencySession, ForestObject, GameId, LifeHubData, MoodEntry, Profile, RelapseEntry, ThemeName } from "@/src/entities/types";
 import { daysBetweenLocal, localDateKey } from "@/src/utils/local-date";
 
 const forestKinds = ["Дуб", "Берёза", "Сосна", "Ива", "Клён", "Рябина", "Липа", "Кедр", "Яблоня", "Магнолия", "Ель", "Бук", "Ольха", "Вяз", "Осина", "Каштан", "Пихта", "Сакура", "Орех", "Платан"];
@@ -56,9 +56,13 @@ interface LifeHubActions {
   updateDayDraft: (day: number, draft: DayDraft) => void;
   completeDay: (day: number, xp: number) => boolean;
   addCraving: (entry: CravingEntry) => void;
+  updateCraving: (entry: CravingEntry) => void;
   addMood: (entry: MoodEntry) => void;
+  updateMood: (entry: MoodEntry) => void;
   addCbt: (entry: CbtEntry) => void;
+  updateCbt: (entry: CbtEntry) => void;
   addRelapse: (entry: RelapseEntry) => void;
+  updateRelapse: (entry: RelapseEntry) => void;
   addEmergency: (entry: EmergencySession) => void;
   completeGame: (game: GameId, level: number) => number;
   setTheme: (theme: ThemeName) => void;
@@ -95,6 +99,62 @@ function normalizeData(saved: LifeHubData): LifeHubData {
     lastProgramCompletionDate: saved.lastProgramCompletionDate ?? completedDates.at(-1) ?? null,
     packPriceHistory: Array.from(new Set([...(saved.packPriceHistory ?? []), ...(price ? [price] : [])])).slice(-10),
   };
+}
+
+type JournalData = Pick<LifeHubData, "cravings" | "moods" | "cbtEntries" | "relapses" | "emergencySessions">;
+type JournalLedger = Map<string, { at: string; difficult: boolean; relapse: boolean; tasks: string[]; xp: number }>;
+const JOURNAL_TASKS = new Set(["Дневник тяги", "Настроение", "CBT-разбор", "Разбор срыва", "Волна тяги пройдена"]);
+
+function journalLedger(data: JournalData): JournalLedger {
+  const ledger: JournalLedger = new Map();
+  const add = (at: string, task: string, xp: number, flags: { difficult?: boolean; relapse?: boolean } = {}) => {
+    const date = localDateKey(at);
+    const previous = ledger.get(date) ?? { at, difficult: false, relapse: false, tasks: [], xp: 0 };
+    ledger.set(date, {
+      at: new Date(at).getTime() > new Date(previous.at).getTime() ? at : previous.at,
+      difficult: previous.difficult || Boolean(flags.difficult),
+      relapse: previous.relapse || Boolean(flags.relapse),
+      tasks: Array.from(new Set([...previous.tasks, task])),
+      xp: previous.xp + xp,
+    });
+  };
+  data.cravings.forEach((entry) => add(entry.at, "Дневник тяги", 12, { difficult: entry.intensity >= 7 }));
+  data.moods.forEach((entry) => add(entry.at, "Настроение", 5, { difficult: entry.score <= 2 }));
+  data.cbtEntries.forEach((entry) => add(entry.at, "CBT-разбор", 18));
+  data.relapses.forEach((entry) => add(entry.at, "Разбор срыва", 0, { difficult: true, relapse: true }));
+  data.emergencySessions.forEach((entry) => add(entry.at, "Волна тяги пройдена", entry.after < entry.before ? 20 : 10, { difficult: entry.before >= 7 }));
+  return ledger;
+}
+
+function reconcileJournalActivity(activity: ActivityDay[], beforeData: JournalData, afterData: JournalData): ActivityDay[] {
+  const before = journalLedger(beforeData);
+  const after = journalLedger(afterData);
+  const byDate = new Map<string, ActivityDay>();
+  activity.forEach((entry) => {
+    const priorJournal = before.get(entry.date);
+    const tasks = entry.tasks.filter((task) => !JOURNAL_TASKS.has(task));
+    const isJournalOnly = tasks.length === 0 && !entry.completed;
+    const remaining: ActivityDay = {
+      ...entry,
+      difficult: isJournalOnly ? false : entry.difficult,
+      relapse: isJournalOnly ? false : entry.relapse,
+      tasks,
+      xp: Math.max(0, entry.xp - (priorJournal?.xp ?? 0)),
+    };
+    if (remaining.completed || remaining.tasks.length || remaining.xp || remaining.difficult || remaining.relapse) byDate.set(entry.date, remaining);
+  });
+  after.forEach((journal, date) => {
+    const current = byDate.get(date) ?? { date, at: journal.at, completed: false, difficult: false, relapse: false, tasks: [], xp: 0 };
+    byDate.set(date, {
+      ...current,
+      at: new Date(journal.at).getTime() > new Date(current.at ?? 0).getTime() ? journal.at : current.at,
+      difficult: current.difficult || journal.difficult,
+      relapse: current.relapse || journal.relapse,
+      tasks: Array.from(new Set([...current.tasks, ...journal.tasks])),
+      xp: current.xp + journal.xp,
+    });
+  });
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export function canCompleteProgramDay(state: Pick<LifeHubData, "activeDay" | "completedDays" | "lastProgramCompletionDate" | "paused">, day: number, now = new Date()): boolean {
@@ -170,13 +230,28 @@ export const useLifeHubStore = create<LifeHubStore>((set, get) => {
       const reward = 12;
       commit({ cravings: [entry, ...get().cravings], xp: get().xp + reward, activity: activityWith(localDateKey(entry.at), "Дневник тяги", reward, { difficult: entry.intensity >= 7, at: entry.at }) });
     },
+    updateCraving: (entry) => {
+      const current = get();
+      const cravings = current.cravings.map((item) => item.id === entry.id ? entry : item);
+      commit({ cravings, activity: reconcileJournalActivity(current.activity, current, { ...current, cravings }) });
+    },
     addMood: (entry) => {
       const reward = 5;
       commit({ moods: [entry, ...get().moods], xp: get().xp + reward, activity: activityWith(localDateKey(entry.at), "Настроение", reward, { difficult: entry.score <= 2, at: entry.at }) });
     },
+    updateMood: (entry) => {
+      const current = get();
+      const moods = current.moods.map((item) => item.id === entry.id ? entry : item);
+      commit({ moods, activity: reconcileJournalActivity(current.activity, current, { ...current, moods }) });
+    },
     addCbt: (entry) => {
       const reward = 18;
       commit({ cbtEntries: [entry, ...get().cbtEntries], xp: get().xp + reward, activity: activityWith(localDateKey(entry.at), "CBT-разбор", reward, { at: entry.at }) });
+    },
+    updateCbt: (entry) => {
+      const current = get();
+      const cbtEntries = current.cbtEntries.map((item) => item.id === entry.id ? entry : item);
+      commit({ cbtEntries, activity: reconcileJournalActivity(current.activity, current, { ...current, cbtEntries }) });
     },
     addRelapse: (entry) => {
       const today = localDateKey(entry.at);
@@ -187,6 +262,11 @@ export const useLifeHubStore = create<LifeHubStore>((set, get) => {
         forest,
         activity: activityWith(today, "Разбор срыва", 0, { difficult: true, relapse: true, at: entry.at }),
       });
+    },
+    updateRelapse: (entry) => {
+      const current = get();
+      const relapses = current.relapses.map((item) => item.id === entry.id ? entry : item);
+      commit({ relapses, activity: reconcileJournalActivity(current.activity, current, { ...current, relapses }) });
     },
     addEmergency: (entry) => {
       const reward = entry.after < entry.before ? 20 : 10;

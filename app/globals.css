@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "./extra.css";
 @import "./pages.css";
+@import "./journal-cards.css";
+@import "./emergency-routes.css";
 
 :root,
 :root[data-theme="dark"] {

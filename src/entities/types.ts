@@ -76,6 +76,7 @@ export interface EmergencySession {
   before: number;
   after: number;
   reason: string;
+  copingChoice?: string;
   completed: boolean;
 }
 

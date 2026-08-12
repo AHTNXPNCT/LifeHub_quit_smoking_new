@@ -1,0 +1,11 @@
+/* Journal entries are interactive controls: a card opens its saved details. */
+.entry-list>article{border-top:1px solid var(--line)}
+.entry-card-button{width:100%;display:grid;grid-template-columns:43px 1fr;gap:13px;padding:15px 0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;border-radius:12px}
+.entry-card-button:hover{background:var(--accent-soft)}
+.entry-card-button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.entry-card-button>div>div{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.entry-card-button small,.entry-card-button>div>span{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:10px}
+.entry-card-button svg{width:13px}.entry-card-button p{font-size:12px;color:var(--muted);margin:5px 0}
+.entry-details{padding:22px;display:grid;gap:16px}.entry-details dl{display:grid;gap:10px;margin:0}.entry-details dl>div{padding:12px 14px;background:var(--card-2);border:1px solid var(--line);border-radius:12px}.entry-details dt{font-size:10px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em}.entry-details dd{margin:5px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text)}
+.coping-grid{grid-template-columns:repeat(2,1fr)}
+@media(max-width:620px){.coping-grid{grid-template-columns:1fr}.entry-card-button{align-items:start}.entry-card-button>div>div{align-items:flex-start;flex-direction:column;gap:4px}}

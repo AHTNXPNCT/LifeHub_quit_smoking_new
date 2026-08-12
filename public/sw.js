@@ -1,7 +1,7 @@
 // A new cache version is used whenever the application shell changes. It
 // prevents an older page bundle from requesting a now-missing lazy-loaded
 // screen after an update.
-const VERSION = "lifehub-v1.3.0";
+const VERSION = "lifehub-v1.3.5";
 const CORE = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

@@ -9,6 +9,7 @@ import { RelapseFlow } from "@/src/features/relapse/RelapseFlow";
 import { useLifeHubStore } from "@/src/store/use-lifehub-store";
 import { registerServiceWorker, showDailyReminder } from "@/src/services/pwa";
 import { localDateKey } from "@/src/utils/local-date";
+import type { RelapseEntry } from "@/src/entities/types";
 
 const pages = {
   home: lazy(() => import("@/src/pages/DashboardPage")),
@@ -47,6 +48,7 @@ export default function LifeHubClient({ initialSection = "home" }: { initialSect
   });
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [relapseOpen, setRelapseOpen] = useState(false);
+  const [relapseEditing, setRelapseEditing] = useState<RelapseEntry | null>(null);
 
   useEffect(() => { void hydrate(); void registerServiceWorker(); }, [hydrate]);
   useEffect(() => {
@@ -80,17 +82,17 @@ export default function LifeHubClient({ initialSection = "home" }: { initialSect
 
   return (
     <MotionConfig reducedMotion={reducedMotion ? "always" : "user"}>
-      <AppShell section={section} onNavigate={navigate} onEmergency={() => setEmergencyOpen(true)} onRelapse={() => setRelapseOpen(true)}>
+      <AppShell section={section} onNavigate={navigate} onEmergency={() => setEmergencyOpen(true)} onRelapse={() => { setRelapseEditing(null); setRelapseOpen(true); }}>
         <Suspense fallback={<div className="page-skeleton"><div /><div /><div /></div>}>
           <AnimatePresence mode="wait">
             <motion.div key={section} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={{ duration: .22 }}>
-              <CurrentPage onNavigate={navigate} onEmergency={() => setEmergencyOpen(true)} onRelapse={() => setRelapseOpen(true)} />
+              <CurrentPage onNavigate={navigate} onEmergency={() => setEmergencyOpen(true)} onRelapse={() => { setRelapseEditing(null); setRelapseOpen(true); }} onEditRelapse={(entry: RelapseEntry) => { setRelapseEditing(entry); setRelapseOpen(true); }} />
             </motion.div>
           </AnimatePresence>
         </Suspense>
       </AppShell>
       <EmergencyFlow open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
-      <RelapseFlow open={relapseOpen} onClose={() => setRelapseOpen(false)} />
+      <RelapseFlow key={`${relapseOpen}-${relapseEditing?.id ?? "new"}`} open={relapseOpen} entry={relapseEditing} onClose={() => { setRelapseOpen(false); setRelapseEditing(null); }} />
     </MotionConfig>
   );
 }
