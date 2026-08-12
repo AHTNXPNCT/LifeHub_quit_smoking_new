@@ -1,0 +1,1 @@
+function e(e,t,n,r){let i=Math.abs(e),a=i%100,o=i%10;return a>=11&&a<=14?r:o===1?t:o>=2&&o<=4?n:r}function t(t,n,r,i){return`${t.toLocaleString(`ru-RU`)} ${e(t,n,r,i)}`}export{e as n,t};

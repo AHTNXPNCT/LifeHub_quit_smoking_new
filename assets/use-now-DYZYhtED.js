@@ -1,0 +1,1 @@
+import{V as e,z as t}from"./index-B3whHXhB.js";var n=e(t(),1);function r(e=1e3){let[t,r]=(0,n.useState)(0);return(0,n.useEffect)(()=>{let t=window.setTimeout(()=>r(Date.now()),0),n=window.setInterval(()=>r(Date.now()),e);return()=>{window.clearTimeout(t),window.clearInterval(n)}},[e]),t}export{r as t};
